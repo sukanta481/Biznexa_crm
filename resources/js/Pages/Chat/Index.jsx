@@ -17,10 +17,22 @@ export default function ChatIndex({ auth }) {
 
     const [assigning, setAssigning] = useState(false);
     const [showTemplateModal, setShowTemplateModal] = useState(false);
+    const [showMobileChat, setShowMobileChat] = useState(false); // Mobile: show chat or list
 
     const [newMessage, setNewMessage] = useState('');
     const [sending, setSending] = useState(false);
     const messagesEndRef = useRef(null);
+
+    // Handle conversation selection (for mobile)
+    const handleSelectConversation = (id) => {
+        setActiveConversationId(id);
+        setShowMobileChat(true); // On mobile, show chat after selecting
+    };
+
+    // Handle back button (mobile only)
+    const handleBackToList = () => {
+        setShowMobileChat(false);
+    };
 
     // Check if 24-hour service window is expired
     const isWindowExpired = () => {
@@ -78,13 +90,21 @@ export default function ChatIndex({ auth }) {
         <AuthenticatedLayout auth={auth} header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Chat</h2>}>
             <Head title="Chat" />
 
-            <div className="py-4">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden h-[calc(100vh-180px)]">
-                        <div className="flex h-full">
+            <div className="py-0 md:py-4">
+                <div className="max-w-7xl mx-auto px-0 md:px-4 lg:px-8">
+                    <div className="bg-white md:rounded-xl shadow-lg border-0 md:border border-gray-200 overflow-hidden h-[calc(100vh-64px)] md:h-[calc(100vh-180px)]">
+                        <div className="flex h-full relative">
 
                             {/* ==================== SIDEBAR ==================== */}
-                            <aside className="w-80 bg-white border-r border-gray-200 flex flex-col">
+                            {/* On mobile: hide when chat is active, full width when visible */}
+                            {/* On desktop: always visible, fixed width */}
+                            <aside className={`
+                                ${showMobileChat ? 'hidden' : 'flex'} 
+                                md:flex 
+                                w-full md:w-80 
+                                bg-white border-r border-gray-200 flex-col
+                                absolute md:relative inset-0 z-10
+                            `}>
                                 {/* Sidebar Header */}
                                 <div className="px-4 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
                                     <h2 className="text-lg font-bold text-gray-900">Conversations</h2>
@@ -99,7 +119,7 @@ export default function ChatIndex({ auth }) {
                                                 key={conversation.id}
                                                 conversation={conversation}
                                                 isActive={activeConversation?.id === conversation.id}
-                                                onClick={() => setActiveConversationId(conversation.id)}
+                                                onClick={() => handleSelectConversation(conversation.id)}
                                             />
                                         ))
                                     ) : (
@@ -113,16 +133,26 @@ export default function ChatIndex({ auth }) {
                             </aside>
 
                             {/* ==================== MAIN CHAT AREA ==================== */}
-                            <main className="flex-1 flex flex-col min-w-0 bg-gray-50">
+                            {/* On mobile: hide when showing list, full width when chat active */}
+                            {/* On desktop: always visible */}
+                            <main className={`
+                                ${showMobileChat ? 'flex' : 'hidden'} 
+                                md:flex 
+                                flex-1 flex-col min-w-0
+                                absolute md:relative inset-0 z-20 md:z-auto
+                                bg-[#ECE5DD]
+                            `}>
                                 {activeConversation ? (
                                     <>
-                                        {/* Chat Header */}
+                                        {/* Chat Header with Back Button on Mobile */}
                                         <ChatHeader
                                             conversation={activeConversation}
                                             currentUserId={auth.user.id}
                                             onToggleAI={handleToggleAI}
                                             onTakeOver={handleTakeOver}
                                             assigning={assigning}
+                                            onBack={handleBackToList}
+                                            showBackButton={showMobileChat}
                                         />
 
                                         {/* Messages Area */}
@@ -245,80 +275,106 @@ function ConversationItem({ conversation, isActive, onClick }) {
 }
 
 /* ==================== CHAT HEADER ==================== */
-function ChatHeader({ conversation, currentUserId, onToggleAI, onTakeOver, assigning }) {
+function ChatHeader({ conversation, currentUserId, onToggleAI, onTakeOver, assigning, onBack, showBackButton }) {
+    const [showMenu, setShowMenu] = useState(false);
     const contact = conversation.contact || {};
     const isAIActive = conversation.is_ai_active;
     const assignedUser = conversation.assigned_user || conversation.assignedUser;
     const isAssignedToMe = assignedUser?.id === currentUserId;
 
     return (
-        <div className="px-6 py-4 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm">
-            {/* Contact Info */}
-            <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
-                    {contact.name?.charAt(0)?.toUpperCase() || '?'}
-                </div>
-                <div>
-                    <h3 className="font-bold text-gray-900 text-lg">{contact.name || 'Unknown Contact'}</h3>
-                    <div className="flex items-center gap-2">
-                        <p className="text-sm text-gray-500">{contact.whatsapp_id || 'No WhatsApp ID'}</p>
-                        {assignedUser && (
-                            <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
-                                {isAssignedToMe ? 'Assigned to you' : `Assigned to ${assignedUser.name}`}
-                            </span>
-                        )}
-                    </div>
-                </div>
+        <div className="px-2 py-2 bg-[#075E54] flex items-center gap-2 shadow-md">
+            {/* Back Button - Mobile */}
+            <button
+                onClick={onBack}
+                className="md:hidden p-2 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Back"
+            >
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
+
+            {/* Contact Avatar */}
+            <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-bold text-lg flex-shrink-0">
+                {contact.name?.charAt(0)?.toUpperCase() || '?'}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-6">
-                {/* Take Over Button */}
-                {!isAssignedToMe && (
-                    <button
-                        onClick={onTakeOver}
-                        disabled={assigning}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${assigning
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg'
-                            }`}
-                    >
-                        {assigning ? (
-                            <>
-                                <LoadingSpinnerSmall />
-                                <span>Assigning...</span>
-                            </>
-                        ) : (
-                            <>
-                                <UserPlusIcon className="w-4 h-4" />
-                                <span>Take Over</span>
-                            </>
-                        )}
-                    </button>
-                )}
+            {/* Contact Info - Flex grow to take space */}
+            <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-white text-base truncate">
+                    {contact.name || 'Unknown'}
+                </h3>
+                <p className="text-xs text-green-100 truncate">
+                    {assignedUser ? (isAssignedToMe ? 'Assigned to you' : assignedUser.name) : 'online'}
+                </p>
+            </div>
 
-                {/* AI Toggle Switch */}
-                <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-gray-600">AI Active</span>
+            {/* Right Actions - Desktop shows inline, mobile shows in menu */}
+            <div className="flex items-center gap-1">
+                {/* AI Status Indicator */}
+                <div className={`px-2 py-1 rounded-full text-xs font-medium ${isAIActive ? 'bg-green-400 text-green-900' : 'bg-red-400 text-red-900'}`}>
+                    {isAIActive ? 'AI ON' : 'AI OFF'}
+                </div>
+
+                {/* Menu Button */}
+                <div className="relative">
                     <button
-                        onClick={onToggleAI}
-                        className={`relative w-16 h-8 rounded-full transition-all duration-300 focus:outline-none focus:ring-4 shadow-inner ${isAIActive
-                            ? 'bg-green-500 focus:ring-green-200'
-                            : 'bg-red-400 focus:ring-red-200'
-                            }`}
+                        onClick={() => setShowMenu(!showMenu)}
+                        className="p-2 rounded-full hover:bg-white/10 transition-colors"
                     >
-                        {/* Toggle Knob */}
-                        <span
-                            className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-lg transform transition-all duration-300 flex items-center justify-center ${isAIActive ? 'left-9' : 'left-1'
-                                }`}
-                        >
-                            {isAIActive ? (
-                                <CheckIcon className="w-3.5 h-3.5 text-green-500" />
-                            ) : (
-                                <XIcon className="w-3.5 h-3.5 text-red-400" />
-                            )}
-                        </span>
+                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="6" r="2" />
+                            <circle cx="12" cy="12" r="2" />
+                            <circle cx="12" cy="18" r="2" />
+                        </svg>
                     </button>
+
+                    {/* Dropdown Menu */}
+                    {showMenu && (
+                        <>
+                            {/* Backdrop */}
+                            <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setShowMenu(false)}
+                            />
+
+                            {/* Menu */}
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl z-50 py-2 border border-gray-100">
+                                {/* Toggle AI */}
+                                <button
+                                    onClick={() => { onToggleAI(); setShowMenu(false); }}
+                                    className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                >
+                                    <span className={`w-3 h-3 rounded-full ${isAIActive ? 'bg-green-500' : 'bg-red-500'}`} />
+                                    <span>{isAIActive ? 'Turn OFF AI' : 'Turn ON AI'}</span>
+                                </button>
+
+                                {/* Take Over */}
+                                {!isAssignedToMe && (
+                                    <button
+                                        onClick={() => { onTakeOver(); setShowMenu(false); }}
+                                        disabled={assigning}
+                                        className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                    >
+                                        <UserPlusIcon className="w-5 h-5 text-indigo-600" />
+                                        <span>{assigning ? 'Assigning...' : 'Take Over Chat'}</span>
+                                    </button>
+                                )}
+
+                                {/* Contact Info */}
+                                <button
+                                    onClick={() => setShowMenu(false)}
+                                    className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                >
+                                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <span>Contact Info</span>
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
@@ -387,52 +443,47 @@ function MessageBubble({ message }) {
 /* ==================== MESSAGE INPUT ==================== */
 function MessageInput({ value, onChange, onSend, disabled }) {
     return (
-        <form onSubmit={onSend} className="px-6 py-4 bg-white border-t border-gray-200">
-            <div className="flex items-center gap-4">
-                {/* Attachment Button */}
-                <button
-                    type="button"
-                    className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                    <AttachmentIcon className="w-5 h-5" />
-                </button>
+        <form onSubmit={onSend} className="px-2 py-2 bg-[#F0F0F0] flex items-center gap-2">
+            {/* Attachment Button */}
+            <button
+                type="button"
+                className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+            >
+                <AttachmentIcon className="w-6 h-6" />
+            </button>
 
-                {/* Text Input */}
-                <div className="flex-1">
-                    <input
-                        type="text"
-                        value={value}
-                        onChange={(e) => onChange(e.target.value)}
-                        placeholder="Type a message..."
-                        disabled={disabled}
-                        className="w-full px-5 py-3 bg-gray-100 rounded-full border-0 focus:ring-2 focus:ring-green-500 focus:bg-white transition-all text-gray-900 placeholder-gray-400"
-                    />
-                </div>
-
-                {/* Emoji Button */}
-                <button
-                    type="button"
-                    className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                    <EmojiIcon className="w-5 h-5" />
-                </button>
-
-                {/* Send Button */}
-                <button
-                    type="submit"
-                    disabled={disabled || !value.trim()}
-                    className={`p-3.5 rounded-full transition-all duration-200 shadow-lg ${disabled || !value.trim()
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
-                        : 'bg-green-500 text-white hover:bg-green-600 hover:shadow-xl'
-                        }`}
-                >
-                    {disabled ? (
-                        <LoadingSpinner small />
-                    ) : (
-                        <SendIcon className="w-5 h-5" />
-                    )}
-                </button>
+            {/* Text Input */}
+            <div className="flex-1">
+                <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder="Type a message"
+                    disabled={disabled}
+                    className="w-full px-4 py-2.5 bg-white rounded-full border-0 focus:ring-0 text-gray-900 placeholder-gray-400 text-sm"
+                />
             </div>
+
+            {/* Emoji Button */}
+            <button
+                type="button"
+                className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+            >
+                <EmojiIcon className="w-6 h-6" />
+            </button>
+
+            {/* Send / Voice Button */}
+            <button
+                type="submit"
+                disabled={disabled}
+                className="p-3 bg-[#00A884] rounded-full text-white shadow-md hover:bg-[#008f72] transition-colors"
+            >
+                {value.trim() ? (
+                    <SendIcon className="w-5 h-5" />
+                ) : (
+                    <MicIcon className="w-5 h-5" />
+                )}
+            </button>
         </form>
     );
 }
@@ -527,6 +578,14 @@ function EmojiIcon({ className }) {
     return (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    );
+}
+
+function MicIcon({ className }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
         </svg>
     );
 }

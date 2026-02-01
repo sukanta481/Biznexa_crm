@@ -100,7 +100,7 @@ export default function Authenticated({ auth, header, children }) {
                             <span className="text-white font-bold text-lg">B</span>
                         </div>
                         {!sidebarCollapsed && (
-                            <span className="font-bold text-xl text-gray-900">Biznexa</span>
+                            <span className="font-bold text-xl text-gray-900">Biznexa CRM</span>
                         )}
                     </Link>
                     <button
@@ -180,7 +180,7 @@ export default function Authenticated({ auth, header, children }) {
                                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
                                         <span className="text-white font-bold text-lg">B</span>
                                     </div>
-                                    <span className="font-bold text-xl text-gray-900">Biznexa</span>
+                                    <span className="font-bold text-xl text-gray-900">Biznexa CRM</span>
                                 </Link>
                             </div>
 
