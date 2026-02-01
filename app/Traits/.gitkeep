@@ -1,0 +1,7 @@
+# Biznexa Traits Directory
+# Place your shared trait classes here
+
+# Example usage:
+# app/Traits/HasUuid.php
+# app/Traits/Auditable.php
+# app/Traits/Filterable.php

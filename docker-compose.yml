@@ -1,0 +1,52 @@
+services:
+  # PostgreSQL 15 - Primary Database (15 for PHP compatibility)
+  postgres:
+    image: postgres:15-alpine
+    container_name: biznexa_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: biznexa
+      POSTGRES_USER: biznexa_user
+      POSTGRES_PASSWORD: biznexa_secret
+    command: [ "postgres", "-c", "password_encryption=md5" ]
+    ports:
+      - "5432:5432"
+    volumes:
+      - biznexa_postgres_data:/var/lib/postgresql/data
+    networks:
+      - biznexa_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U biznexa_user -d biznexa" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 7 - Queues, Cache, Sessions
+  redis:
+    image: redis:7-alpine
+    container_name: biznexa_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - biznexa_redis_data:/data
+    networks:
+      - biznexa_network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Persistent Volumes
+volumes:
+  biznexa_postgres_data:
+    driver: local
+  biznexa_redis_data:
+    driver: local
+
+# Network
+networks:
+  biznexa_network:
+    driver: bridge

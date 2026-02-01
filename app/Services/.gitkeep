@@ -1,0 +1,7 @@
+# Biznexa Services Directory
+# Place your business logic classes here
+
+# Example usage:
+# app/Services/LeadService.php
+# app/Services/ContactService.php
+# app/Services/DealService.php
