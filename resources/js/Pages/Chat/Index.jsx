@@ -18,6 +18,7 @@ export default function ChatIndex({ auth }) {
     const [assigning, setAssigning] = useState(false);
     const [showTemplateModal, setShowTemplateModal] = useState(false);
     const [showMobileChat, setShowMobileChat] = useState(false); // Mobile: show chat or list
+    const [showNewChatModal, setShowNewChatModal] = useState(false);
 
     const [newMessage, setNewMessage] = useState('');
     const [sending, setSending] = useState(false);
@@ -106,8 +107,19 @@ export default function ChatIndex({ auth }) {
                                 absolute md:relative inset-0 z-10
                             `}>
                                 {/* Sidebar Header */}
-                                <div className="px-4 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                                    <h2 className="text-lg font-bold text-gray-900">Conversations</h2>
+                                <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <h2 className="text-lg font-bold text-gray-900">Conversations</h2>
+                                        <button
+                                            onClick={() => setShowNewChatModal(true)}
+                                            className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors shadow-md"
+                                            title="New Chat"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                     <p className="text-sm text-gray-500">{conversations.length} total</p>
                                 </div>
 
@@ -205,6 +217,18 @@ export default function ChatIndex({ auth }) {
                         </div>
                     </div>
                 </div>
+
+                {/* New Chat Modal */}
+                {showNewChatModal && (
+                    <NewChatModal
+                        onClose={() => setShowNewChatModal(false)}
+                        onSuccess={(conversationId) => {
+                            setShowNewChatModal(false);
+                            setActiveConversationId(conversationId);
+                            setShowMobileChat(true); // Show chat on mobile
+                        }}
+                    />
+                )}
             </div>
         </AuthenticatedLayout>
     );
@@ -630,3 +654,156 @@ function DoubleCheckIcon({ className }) {
         </svg>
     );
 }
+
+/* ==================== NEW CHAT MODAL ==================== */
+function NewChatModal({ onClose, onSuccess }) {
+    const [formData, setFormData] = useState({
+        name: '',
+        whatsapp_number: '',
+    });
+    const [errors, setErrors] = useState({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setErrors({});
+        setIsSubmitting(true);
+
+        try {
+            // Validate phone number format (basic)
+            const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+            if (!phoneRegex.test(formData.whatsapp_number.replace(/\s/g, ''))) {
+                setErrors({ whatsapp_number: 'Invalid WhatsApp number format. Use international format (e.g., +91XXXXXXXXXX)' });
+                setIsSubmitting(false);
+                return;
+            }
+
+            const response = await fetch('/api/contacts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    name: formData.name,
+                    whatsapp_id: formData.whatsapp_number.replace(/\s/g, ''),
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                setErrors(data.errors || { general: data.message || 'Failed to create contact' });
+                setIsSubmitting(false);
+                return;
+            }
+
+            // Success - notify parent with conversation ID
+            onSuccess(data.conversation_id);
+        } catch (error) {
+            setErrors({ general: 'An error occurred. Please try again.' });
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-white">New Chat</h3>
+                            <p className="text-sm text-green-100">Start a conversation with a contact</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-white hover:bg-white/20 rounded-full p-1">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {/* General Error */}
+                    {errors.general && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+                            {errors.general}
+                        </div>
+                    )}
+
+                    {/* Name Field */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Contact Name
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="Enter contact name"
+                            required
+                        />
+                        {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                    </div>
+
+                    {/* WhatsApp Number Field */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            WhatsApp Number
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.whatsapp_number}
+                            onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono"
+                            placeholder="+919876543210"
+                            required
+                        />
+                        {errors.whatsapp_number && <p className="mt-1 text-sm text-red-600">{errors.whatsapp_number}</p>}
+                        <p className="mt-1 text-xs text-gray-500">
+                            Use international format with country code (e.g., +91 for India)
+                        </p>
+                    </div>
+
+                    {/* Info Box */}
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <p className="text-xs text-amber-800">
+                            <strong>Note:</strong> The first message to this contact must use a WhatsApp-approved template message due to Meta's 24-hour messaging window policy.
+                        </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-colors ${isSubmitting
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : 'bg-green-500 text-white hover:bg-green-600 shadow-md'
+                                }`}
+                        >
+                            {isSubmitting ? 'Creating...' : 'Start Chat'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
