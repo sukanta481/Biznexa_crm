@@ -715,8 +715,9 @@ function NewChatModal({ onClose, onSuccess }) {
                 return;
             }
 
-            // Success - notify parent with conversation ID
-            onSuccess(data.conversation_id);
+            // Success - close modal and reload page to show new conversation
+            onClose();
+            window.location.reload();
         } catch (error) {
             console.error('Contact creation error:', error);
             setErrors({ general: `Error: ${error.message}` });
