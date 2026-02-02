@@ -678,10 +678,13 @@ function NewChatModal({ onClose, onSuccess }) {
                 return;
             }
 
+            console.log('Creating contact...', formData);
+
             const response = await fetch('/api/contacts', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
                 },
                 credentials: 'include',
@@ -691,7 +694,20 @@ function NewChatModal({ onClose, onSuccess }) {
                 }),
             });
 
+            console.log('Response status:', response.status);
+
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('Non-JSON response:', text);
+                setErrors({ general: `Server error (${response.status}): Please check server logs` });
+                setIsSubmitting(false);
+                return;
+            }
+
             const data = await response.json();
+            console.log('Response data:', data);
 
             if (!response.ok) {
                 setErrors(data.errors || { general: data.message || 'Failed to create contact' });
@@ -702,7 +718,8 @@ function NewChatModal({ onClose, onSuccess }) {
             // Success - notify parent with conversation ID
             onSuccess(data.conversation_id);
         } catch (error) {
-            setErrors({ general: 'An error occurred. Please try again.' });
+            console.error('Contact creation error:', error);
+            setErrors({ general: `Error: ${error.message}` });
             setIsSubmitting(false);
         }
     };
@@ -794,8 +811,8 @@ function NewChatModal({ onClose, onSuccess }) {
                             type="submit"
                             disabled={isSubmitting}
                             className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-colors ${isSubmitting
-                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    : 'bg-green-500 text-white hover:bg-green-600 shadow-md'
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-green-500 text-white hover:bg-green-600 shadow-md'
                                 }`}
                         >
                             {isSubmitting ? 'Creating...' : 'Start Chat'}
