@@ -31,6 +31,69 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
 Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
 
+// Simple test route to check if API routes are loading
+Route::get('/test', function () {
+    return response()->json(['status' => 'API routes loading OK', 'time' => now()]);
+});
+
+// Create new contact and conversation (temporarily moved outside auth for debugging)
+Route::post('/contacts', function (Request $request) {
+    try {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'whatsapp_id' => 'required|string|max:20',
+        ]);
+
+        // Check if contact already exists
+        $existingContact = \App\Models\Contact::where('whatsapp_id', $validated['whatsapp_id'])->first();
+        
+        if ($existingContact) {
+            // Find or create conversation for existing contact
+            $conversation = Conversation::firstOrCreate(
+                ['contact_id' => $existingContact->id],
+                [
+                    'status' => 'open',
+                    'is_ai_active' => true,
+                ]
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Contact already exists',
+                'contact_id' => $existingContact->id,
+                'conversation_id' => $conversation->id,
+            ]);
+        }
+
+        // Create new contact
+        $contact = \App\Models\Contact::create([
+            'name' => $validated['name'],
+            'whatsapp_id' => $validated['whatsapp_id'],
+            'phone_number' => $validated['whatsapp_id'],
+        ]);
+
+        // Create conversation for the contact
+        $conversation = Conversation::create([
+            'contact_id' => $contact->id,
+            'status' => 'open',
+            'is_ai_active' => true,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Contact created successfully',
+            'contact_id' => $contact->id,
+            'conversation_id' => $conversation->id,
+        ], 201);
+    } catch (\Exception $e) {
+        \Log::error('Contact creation failed', ['error' => $e->getMessage()]);
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to create contact: ' . $e->getMessage(),
+        ], 500);
+    }
+});
+
 /*
 |--------------------------------------------------------------------------
 | Conversation API Routes (for React frontend)
@@ -122,64 +185,4 @@ Route::middleware('auth:web')->group(function () {
 
         return response()->json($conversation->fresh());
     });
-
-    // Create new contact and conversation
-    Route::post('/contacts', function (Request $request) {
-        try {
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'whatsapp_id' => 'required|string|max:20',
-            ]);
-
-            // Check if contact already exists
-            $existingContact = \App\Models\Contact::where('whatsapp_id', $validated['whatsapp_id'])->first();
-            
-            if ($existingContact) {
-                // Find or create conversation for existing contact
-                $conversation = Conversation::firstOrCreate(
-                    ['contact_id' => $existingContact->id],
-                    [
-                        'status' => 'open',
-                        'is_ai_active' => true,
-                    ]
-                );
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Contact already exists',
-                    'contact_id' => $existingContact->id,
-                    'conversation_id' => $conversation->id,
-                ]);
-            }
-
-            // Create new contact
-            $contact = \App\Models\Contact::create([
-                'name' => $validated['name'],
-                'whatsapp_id' => $validated['whatsapp_id'],
-                'phone_number' => $validated['whatsapp_id'],
-            ]);
-
-            // Create conversation for the contact
-            $conversation = Conversation::create([
-                'contact_id' => $contact->id,
-                'status' => 'open',
-                'is_ai_active' => true,
-                'assigned_to_user_id' => auth()->id(),
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Contact created successfully',
-                'contact_id' => $contact->id,
-                'conversation_id' => $conversation->id,
-            ], 201);
-        } catch (\Exception $e) {
-            \Log::error('Contact creation failed', ['error' => $e->getMessage()]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create contact: ' . $e->getMessage(),
-            ], 500);
-        }
-    });
 });
-
