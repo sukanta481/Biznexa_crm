@@ -13,6 +13,7 @@ export default function Settings({ auth, whatsappSettings }) {
 
     const { data, setData, post, processing, errors, recentlySuccessful } = useForm({
         whatsapp_phone_number_id: settingsObj.whatsapp_phone_number_id || '',
+        whatsapp_business_account_id: settingsObj.whatsapp_business_account_id || '',
         whatsapp_access_token: settingsObj.whatsapp_access_token || '',
         whatsapp_webhook_verify_token: settingsObj.whatsapp_webhook_verify_token || '',
     });
@@ -87,7 +88,27 @@ export default function Settings({ auth, whatsappSettings }) {
                                         <p className="mt-1 text-sm text-red-600">{errors.whatsapp_phone_number_id}</p>
                                     )}
                                     <p className="mt-1 text-xs text-gray-500">
-                                        Found in Meta Business Suite → WhatsApp → API Setup
+                                        Found in Meta Business Suite → WhatsApp → API Setup (e.g., 959662030568505)
+                                    </p>
+                                </div>
+
+                                {/* WhatsApp Business Account ID */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        WhatsApp Business Account ID (WABA ID)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.whatsapp_business_account_id}
+                                        onChange={(e) => setData('whatsapp_business_account_id', e.target.value)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        placeholder="Enter your WhatsApp Business Account ID"
+                                    />
+                                    {errors.whatsapp_business_account_id && (
+                                        <p className="mt-1 text-sm text-red-600">{errors.whatsapp_business_account_id}</p>
+                                    )}
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Found in Meta Business Suite → WhatsApp → API Setup (e.g., 120793386478522). Required for template messages.
                                     </p>
                                 </div>
 

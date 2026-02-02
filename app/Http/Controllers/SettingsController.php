@@ -27,6 +27,7 @@ class SettingsController extends Controller
     {
         $validated = $request->validate([
             'whatsapp_phone_number_id' => 'nullable|string|max:255',
+            'whatsapp_business_account_id' => 'nullable|string|max:255',
             'whatsapp_access_token' => 'nullable|string|max:500',
             'whatsapp_webhook_verify_token' => 'nullable|string|max:255',
         ]);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 
 /**
@@ -8,37 +8,46 @@ import axios from 'axios';
 export default function TemplateModal({ isOpen, onClose, conversationId, contactPhone, onSuccess }) {
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [sending, setSending] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [templates, setTemplates] = useState([]);
 
-    // Pre-defined templates (in production, fetch from API)
-    const templates = [
+    // Fetch templates from API on mount
+    useEffect(() => {
+        if (isOpen) {
+            fetchTemplates();
+        }
+    }, [isOpen]);
+
+    const fetchTemplates = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await axios.get('/api/whatsapp/templates');
+            if (response.data.success) {
+                setTemplates(response.data.templates);
+                if (response.data.templates.length === 0) {
+                    setError('No approved templates found. Please create and get templates approved in Meta Business Suite first.');
+                }
+            } else {
+                setError(response.data.error || 'Failed to fetch templates');
+            }
+        } catch (err) {
+            console.error('Failed to fetch templates:', err);
+            setError(err.response?.data?.error || 'Failed to fetch templates. Make sure WhatsApp Business Account ID is configured in Settings.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Fallback templates if API fails
+    const fallbackTemplates = [
         {
             id: 'hello_world',
-            name: 'Hello World',
+            name: 'hello_world',
             description: 'Simple greeting message',
             language: 'en_US',
-            preview: 'Hello! 👋 Thank you for contacting us. How may we assist you today?',
-        },
-        {
-            id: 'order_update',
-            name: 'Order Update',
-            description: 'Notify customer about order status',
-            language: 'en_US',
-            preview: 'Hello {{1}}! Your order #{{2}} has been {{3}}. Track your order at {{4}}',
-        },
-        {
-            id: 'appointment_reminder',
-            name: 'Appointment Reminder',
-            description: 'Remind customer about scheduled appointment',
-            language: 'en_US',
-            preview: 'Hi {{1}}! This is a reminder for your appointment scheduled on {{2}} at {{3}}.',
-        },
-        {
-            id: 'payment_confirmation',
-            name: 'Payment Confirmation',
-            description: 'Confirm payment received',
-            language: 'en_US',
-            preview: 'Thank you {{1}}! We have received your payment of ₹{{2}} for invoice #{{3}}.',
+            preview: 'Hello World!',
         },
     ];
 
@@ -50,21 +59,24 @@ export default function TemplateModal({ isOpen, onClose, conversationId, contact
 
         try {
             const response = await axios.post(`/api/conversations/${conversationId}/template`, {
-                template_name: selectedTemplate.id,
-                language_code: selectedTemplate.language,
+                template_name: selectedTemplate.name,
+                language_code: selectedTemplate.language?.code || selectedTemplate.language || 'en_US',
             });
 
             onSuccess?.(response.data);
             onClose();
         } catch (err) {
             console.error('Failed to send template:', err);
-            setError(err.response?.data?.message || 'Failed to send template. Please try again.');
+            setError(err.response?.data?.error || err.response?.data?.message || 'Failed to send template. Please try again.');
         } finally {
             setSending(false);
         }
     };
 
     if (!isOpen) return null;
+
+    // Get display templates (from API or fallback)
+    const displayTemplates = templates.length > 0 ? templates : (loading ? [] : fallbackTemplates);
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -93,32 +105,58 @@ export default function TemplateModal({ isOpen, onClose, conversationId, contact
                         </button>
                     </div>
 
+                    {/* Loading State */}
+                    {loading && (
+                        <div className="p-8 text-center">
+                            <LoadingSpinner className="w-8 h-8 mx-auto mb-3" />
+                            <p className="text-gray-500">Loading templates...</p>
+                        </div>
+                    )}
+
                     {/* Template List */}
-                    <div className="p-4 max-h-80 overflow-y-auto space-y-3">
-                        {templates.map((template) => (
-                            <button
-                                key={template.id}
-                                onClick={() => setSelectedTemplate(template)}
-                                className={`w-full p-4 rounded-lg border-2 text-left transition-all ${selectedTemplate?.id === template.id
-                                        ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
-                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                        <h4 className="font-semibold text-gray-900">{template.name}</h4>
-                                        <p className="text-sm text-gray-500 mt-0.5">{template.description}</p>
+                    {!loading && (
+                        <div className="p-4 max-h-80 overflow-y-auto space-y-3">
+                            {displayTemplates.map((template) => (
+                                <button
+                                    key={template.id || template.name}
+                                    onClick={() => setSelectedTemplate(template)}
+                                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${selectedTemplate?.name === template.name
+                                            ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+                                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                            <h4 className="font-semibold text-gray-900">{template.name}</h4>
+                                            <p className="text-sm text-gray-500 mt-0.5">
+                                                {template.category || 'Template'} • {template.language?.code || template.language || 'en_US'}
+                                            </p>
+                                        </div>
+                                        {selectedTemplate?.name === template.name && (
+                                            <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0" />
+                                        )}
                                     </div>
-                                    {selectedTemplate?.id === template.id && (
-                                        <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0" />
+                                    {/* Template preview from components */}
+                                    {template.components && (
+                                        <div className="mt-3 p-3 bg-gray-100 rounded-lg">
+                                            <p className="text-sm text-gray-600 italic">
+                                                {template.components.find(c => c.type === 'BODY')?.text || 'Preview not available'}
+                                            </p>
+                                        </div>
                                     )}
+                                </button>
+                            ))}
+                            
+                            {displayTemplates.length === 0 && !loading && (
+                                <div className="text-center py-8">
+                                    <p className="text-gray-500">No templates available</p>
+                                    <p className="text-sm text-gray-400 mt-1">
+                                        Create templates in Meta Business Suite and wait for approval
+                                    </p>
                                 </div>
-                                <div className="mt-3 p-3 bg-gray-100 rounded-lg">
-                                    <p className="text-sm text-gray-600 italic">{template.preview}</p>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Error */}
                     {error && (

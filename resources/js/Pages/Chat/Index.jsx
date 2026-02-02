@@ -235,13 +235,14 @@ export default function ChatIndex({ auth }) {
                 {/* Template Modal */}
                 {showTemplateModal && activeConversation && (
                     <TemplateModal
-                        contact={activeConversation.contact}
+                        isOpen={showTemplateModal}
+                        conversationId={activeConversation.id}
+                        contactPhone={activeConversation.contact?.whatsapp_id}
                         onClose={() => setShowTemplateModal(false)}
-                        onSend={(templateName) => {
-                            // Send template message via API
-                            console.log('Sending template:', templateName);
+                        onSuccess={(data) => {
                             setShowTemplateModal(false);
-                            alert('Template message feature requires WhatsApp Business API setup with approved templates.');
+                            // Refresh messages after template sent
+                            setActiveConversationId(activeConversation.id);
                         }}
                     />
                 )}

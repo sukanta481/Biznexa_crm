@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Models\Conversation;
 use App\Models\Message;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -34,6 +35,18 @@ Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
 // Simple test route to check if API routes are loading
 Route::get('/test', function () {
     return response()->json(['status' => 'API routes loading OK', 'time' => now()]);
+});
+
+// WhatsApp config status check (for debugging)
+Route::get('/whatsapp/status', function () {
+    $whatsApp = app(\App\Services\WhatsAppService::class);
+    return response()->json($whatsApp->getConfigStatus());
+});
+
+// Fetch approved WhatsApp templates
+Route::middleware('auth:web')->get('/whatsapp/templates', function () {
+    $whatsApp = app(\App\Services\WhatsAppService::class);
+    return response()->json($whatsApp->getTemplates());
 });
 
 // Create new contact and conversation (temporarily moved outside auth for debugging)
@@ -86,7 +99,7 @@ Route::post('/contacts', function (Request $request) {
             'conversation_id' => $conversation->id,
         ], 201);
     } catch (\Exception $e) {
-        \Log::error('Contact creation failed', ['error' => $e->getMessage()]);
+        Log::error('Contact creation failed', ['error' => $e->getMessage()]);
         return response()->json([
             'success' => false,
             'message' => 'Failed to create contact: ' . $e->getMessage(),
@@ -184,5 +197,54 @@ Route::middleware('auth:web')->group(function () {
         $conversation->update($validated);
 
         return response()->json($conversation->fresh());
+    });
+
+    // Send template message to re-initiate conversation outside 24-hour window
+    Route::post('/conversations/{conversation}/template', function (Request $request, Conversation $conversation) {
+        $validated = $request->validate([
+            'template_name' => 'required|string',
+            'language_code' => 'sometimes|string',
+        ]);
+
+        // Create outbound message record
+        $message = $conversation->messages()->create([
+            'type' => 'template',
+            'direction' => 'outbound',
+            'body' => "[Template: {$validated['template_name']}]",
+            'status' => 'pending',
+        ]);
+
+        // Send via WhatsApp API
+        $whatsApp = app(\App\Services\WhatsAppService::class);
+        $result = $whatsApp->sendTemplateMessage(
+            $conversation->contact->whatsapp_id,
+            $validated['template_name'],
+            $validated['language_code'] ?? 'en_US'
+        );
+
+        // Update message with result
+        if ($result['success']) {
+            $message->update([
+                'wam_id' => $result['message_id'],
+                'status' => 'sent',
+            ]);
+            
+            // Update conversation to re-open the 24-hour window
+            $conversation->update([
+                'last_interaction_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $message->fresh(),
+            ]);
+        } else {
+            $message->update(['status' => 'failed']);
+            
+            return response()->json([
+                'success' => false,
+                'error' => $result['error'] ?? 'Failed to send template message',
+            ], 422);
+        }
     });
 });

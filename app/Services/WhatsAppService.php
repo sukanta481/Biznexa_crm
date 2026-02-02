@@ -406,4 +406,103 @@ class WhatsAppService
 
         return $mapping[$mimeType] ?? 'bin';
     }
+
+    /**
+     * Get approved message templates from WhatsApp Business API.
+     *
+     * @return array{success: bool, templates: array, error: ?string}
+     */
+    public function getTemplates(): array
+    {
+        if (!$this->isConfigured()) {
+            return [
+                'success' => false,
+                'templates' => [],
+                'error' => 'WhatsApp API not configured',
+            ];
+        }
+
+        try {
+            // Get the WhatsApp Business Account ID from settings
+            $wabaid = Setting::get('whatsapp_business_account_id') 
+                ?? config('services.whatsapp.business_account_id', '');
+            
+            if (empty($wabaid)) {
+                Log::warning('WhatsApp Business Account ID not configured');
+                return [
+                    'success' => false,
+                    'templates' => [],
+                    'error' => 'WhatsApp Business Account ID not configured. Please add it in Settings.',
+                ];
+            }
+
+            $apiVersion = config('services.whatsapp.api_version', 'v18.0');
+            
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->accessToken,
+            ])->get("https://graph.facebook.com/{$apiVersion}/{$wabaid}/message_templates", [
+                'limit' => 100,
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json('data', []);
+                
+                // Filter only approved templates
+                $approvedTemplates = array_filter($data, function ($template) {
+                    return ($template['status'] ?? '') === 'APPROVED';
+                });
+
+                return [
+                    'success' => true,
+                    'templates' => array_values($approvedTemplates),
+                    'error' => null,
+                ];
+            }
+
+            $error = $response->json('error.message') ?? 'Failed to fetch templates';
+            Log::error('Failed to fetch WhatsApp templates', [
+                'status' => $response->status(),
+                'error' => $error,
+            ]);
+
+            return [
+                'success' => false,
+                'templates' => [],
+                'error' => $error,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Exception while fetching templates', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'templates' => [],
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Get the Phone Number ID.
+     */
+    public function getPhoneNumberId(): string
+    {
+        return $this->phoneNumberId;
+    }
+
+    /**
+     * Get configuration status details for debugging.
+     */
+    public function getConfigStatus(): array
+    {
+        return [
+            'is_configured' => $this->isConfigured(),
+            'has_phone_number_id' => !empty($this->phoneNumberId),
+            'has_access_token' => !empty($this->accessToken),
+            'phone_number_id' => $this->phoneNumberId ? substr($this->phoneNumberId, 0, 6) . '...' : null,
+            'base_url' => $this->baseUrl,
+        ];
+    }
 }
