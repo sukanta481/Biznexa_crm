@@ -17,6 +17,7 @@ export default function ChatIndex({ auth }) {
 
     const [assigning, setAssigning] = useState(false);
     const [showTemplateModal, setShowTemplateModal] = useState(false);
+    const [showContactInfo, setShowContactInfo] = useState(false);
     const [showMobileChat, setShowMobileChat] = useState(false); // Mobile: show chat or list
     const [showNewChatModal, setShowNewChatModal] = useState(false);
 
@@ -165,6 +166,7 @@ export default function ChatIndex({ auth }) {
                                             assigning={assigning}
                                             onBack={handleBackToList}
                                             showBackButton={showMobileChat}
+                                            onContactInfo={() => setShowContactInfo(true)}
                                         />
 
                                         {/* Messages Area */}
@@ -227,6 +229,29 @@ export default function ChatIndex({ auth }) {
                             setActiveConversationId(conversationId);
                             setShowMobileChat(true); // Show chat on mobile
                         }}
+                    />
+                )}
+
+                {/* Template Modal */}
+                {showTemplateModal && activeConversation && (
+                    <TemplateModal
+                        contact={activeConversation.contact}
+                        onClose={() => setShowTemplateModal(false)}
+                        onSend={(templateName) => {
+                            // Send template message via API
+                            console.log('Sending template:', templateName);
+                            setShowTemplateModal(false);
+                            alert('Template message feature requires WhatsApp Business API setup with approved templates.');
+                        }}
+                    />
+                )}
+
+                {/* Contact Info Modal */}
+                {showContactInfo && activeConversation && (
+                    <ContactInfoModal
+                        contact={activeConversation.contact}
+                        conversation={activeConversation}
+                        onClose={() => setShowContactInfo(false)}
                     />
                 )}
             </div>
@@ -299,7 +324,7 @@ function ConversationItem({ conversation, isActive, onClick }) {
 }
 
 /* ==================== CHAT HEADER ==================== */
-function ChatHeader({ conversation, currentUserId, onToggleAI, onTakeOver, assigning, onBack, showBackButton }) {
+function ChatHeader({ conversation, currentUserId, onToggleAI, onTakeOver, assigning, onBack, showBackButton, onContactInfo }) {
     const [showMenu, setShowMenu] = useState(false);
     const contact = conversation.contact || {};
     const isAIActive = conversation.is_ai_active;
@@ -388,7 +413,7 @@ function ChatHeader({ conversation, currentUserId, onToggleAI, onTakeOver, assig
 
                                 {/* Contact Info */}
                                 <button
-                                    onClick={() => setShowMenu(false)}
+                                    onClick={() => { onContactInfo(); setShowMenu(false); }}
                                     className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                                 >
                                     <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -825,3 +850,131 @@ function NewChatModal({ onClose, onSuccess }) {
     );
 }
 
+/* ==================== TEMPLATE MODAL ==================== */
+function TemplateModal({ contact, onClose, onSend }) {
+    const templates = [
+        { id: 'hello', name: 'Hello Template', description: 'Simple greeting message' },
+        { id: 'follow_up', name: 'Follow Up', description: 'Follow up with customer' },
+        { id: 'welcome', name: 'Welcome Message', description: 'Welcome new customer' },
+        { id: 'order_update', name: 'Order Update', description: 'Update about order status' },
+    ];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                {/* Header */}
+                <div className="p-4 bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <TemplateIcon className="w-6 h-6 text-white" />
+                        <h2 className="text-lg font-semibold text-white">Send Template</h2>
+                    </div>
+                    <button onClick={onClose} className="text-white hover:bg-white/20 p-1 rounded">
+                        <XIcon className="w-6 h-6" />
+                    </button>
+                </div>
+
+                {/* Info */}
+                <div className="p-4 bg-amber-50 border-b border-amber-100">
+                    <p className="text-sm text-amber-700">
+                        <strong>Sending to:</strong> {contact?.name || 'Unknown'} ({contact?.whatsapp_id || contact?.phone_number})
+                    </p>
+                </div>
+
+                {/* Template List */}
+                <div className="p-4 max-h-60 overflow-y-auto">
+                    <p className="text-sm text-gray-600 mb-3">Select a pre-approved template:</p>
+                    <div className="space-y-2">
+                        {templates.map((template) => (
+                            <button
+                                key={template.id}
+                                onClick={() => onSend(template.id)}
+                                className="w-full p-3 text-left border rounded-lg hover:border-amber-400 hover:bg-amber-50 transition-colors"
+                            >
+                                <p className="font-medium text-gray-800">{template.name}</p>
+                                <p className="text-sm text-gray-500">{template.description}</p>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
+                    <p className="text-xs text-gray-500">
+                        Templates must be pre-approved by WhatsApp Business API
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ==================== CONTACT INFO MODAL ==================== */
+function ContactInfoModal({ contact, conversation, onClose }) {
+    const formatDate = (date) => {
+        if (!date) return 'N/A';
+        return new Date(date).toLocaleString();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                {/* Header */}
+                <div className="p-4 bg-gradient-to-r from-green-600 to-green-700 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">Contact Info</h2>
+                    <button onClick={onClose} className="text-white hover:bg-white/20 p-1 rounded">
+                        <XIcon className="w-6 h-6" />
+                    </button>
+                </div>
+
+                {/* Avatar and Name */}
+                <div className="p-6 flex flex-col items-center border-b border-gray-100">
+                    <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-3xl mb-3">
+                        {contact?.name?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-800">{contact?.name || 'Unknown'}</h3>
+                    <p className="text-sm text-gray-500">{contact?.whatsapp_id || contact?.phone_number || 'No number'}</p>
+                </div>
+
+                {/* Contact Details */}
+                <div className="p-4 space-y-4">
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-wide">Phone Number</label>
+                        <p className="text-gray-800 font-medium">{contact?.phone_number || contact?.whatsapp_id || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-wide">Email</label>
+                        <p className="text-gray-800 font-medium">{contact?.email || 'Not provided'}</p>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-wide">Conversation Status</label>
+                        <p className="text-gray-800 font-medium capitalize">{conversation?.status || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-wide">AI Status</label>
+                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${conversation?.is_ai_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {conversation?.is_ai_active ? 'AI Active' : 'AI Inactive'}
+                        </span>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-wide">Last Interaction</label>
+                        <p className="text-gray-800 font-medium">{formatDate(conversation?.last_interaction_at || conversation?.updated_at)}</p>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-wide">Created</label>
+                        <p className="text-gray-800 font-medium">{formatDate(contact?.created_at)}</p>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 bg-gray-50 border-t border-gray-100">
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
